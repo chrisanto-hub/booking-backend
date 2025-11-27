@@ -1,4 +1,4 @@
-// booking-backend/server.js
+// server.js
 const express = require('express');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
@@ -8,14 +8,14 @@ const path = require('path');
 dotenv.config();
 const app = express();
 
-// CORS: allow your production frontends
+// CORS setup
 app.use(cors({
   origin: process.env.CORS_ORIGIN?.split(',') || '*',
   credentials: true,
 }));
 app.use(express.json());
 
-// Serve uploads (avatars)
+// Serve static uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // MongoDB connection
@@ -32,7 +32,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/admin', adminRoutes);
 
-const PORT = process.env.PORT || 5000;
+// Health check
+app.get('/', (req, res) => res.send('🚀 Backend is running'));
+
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌍 Server live at http://localhost:${PORT}`);
 });

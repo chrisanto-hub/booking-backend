@@ -23,27 +23,26 @@ const handleValidation = (req, res, next) => {
   next();
 };
 
-// ✅ Register new user
+// ✅ Register
 router.post(
   '/register',
   [
-    body('name').trim().isLength({ min: 2, max: 50 }).withMessage('Name must be 2–50 characters'),
-    body('email').isEmail().withMessage('Valid email required'),
+    body('name').trim().isLength({ min: 2, max: 50 }),
+    body('email').isEmail(),
     body('password')
-      .isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-      .matches(/[A-Za-z]/).withMessage('Password must contain letters')
-      .matches(/[0-9]/).withMessage('Password must contain numbers'),
+      .isLength({ min: 8 })
+      .matches(/[A-Za-z]/)
+      .matches(/[0-9]/),
   ],
   handleValidation,
   async (req, res) => {
     try {
       const { name, email, password } = req.body;
-      let user = await User.findOne({ email });
-      if (user) return res.status(400).json({ error: 'User already exists' });
+      const existing = await User.findOne({ email });
+      if (existing) return res.status(400).json({ error: 'User already exists' });
 
-      const hashedPassword = await bcrypt.hash(password, 10);
-      user = new User({ name, email, password: hashedPassword });
-      await user.save();
+      const hashed = await bcrypt.hash(password, 10);
+      const user = await User.create({ name, email, password: hashed });
 
       const token = jwt.sign({ id: user._id, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '1d' });
       res.json({ token });
@@ -53,12 +52,12 @@ router.post(
   }
 );
 
-// ✅ Login user
+// ✅ Login
 router.post(
   '/login',
   [
-    body('email').isEmail().withMessage('Valid email required'),
-    body('password').notEmpty().withMessage('Password required'),
+    body('email').isEmail(),
+    body('password').notEmpty(),
   ],
   handleValidation,
   async (req, res) => {
@@ -67,8 +66,8 @@ router.post(
       const user = await User.findOne({ email });
       if (!user) return res.status(400).json({ error: 'Invalid credentials' });
 
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) return res.status(400).json({ error: 'Invalid credentials' });
 
       const token = jwt.sign({ id: user._id, isAdmin: user.isAdmin }, process.env.JWT_SECRET, { expiresIn: '1d' });
       res.json({ token });
@@ -78,20 +77,20 @@ router.post(
   }
 );
 
-// ✅ Get current user profile
+// ✅ Get profile
 router.get('/me', authMiddleware, async (req, res) => {
   const user = await User.findById(req.user.id).select('-password');
   res.json(user);
 });
 
-// ✅ Update profile (name/email/avatar)
+// ✅ Update profile
 router.put(
   '/profile',
   authMiddleware,
   upload.single('avatar'),
   [
-    body('name').optional().trim().isLength({ min: 2, max: 50 }).withMessage('Name must be 2–50 characters'),
-    body('email').optional().isEmail().withMessage('Valid email required'),
+    body('name').optional().trim().isLength({ min: 2, max: 50 }),
+    body('email').optional().isEmail(),
   ],
   handleValidation,
   async (req, res) => {
@@ -109,30 +108,28 @@ router.put(
   }
 );
 
-// ✅ Update password
+// ✅ Change password
 router.put(
   '/password',
   authMiddleware,
   [
-    body('oldPassword').notEmpty().withMessage('Old password required'),
+    body('oldPassword').notEmpty(),
     body('newPassword')
-      .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
-      .matches(/[A-Za-z]/).withMessage('New password must contain letters')
-      .matches(/[0-9]/).withMessage('New password must contain numbers'),
+      .isLength({ min: 8 })
+      .matches(/[A-Za-z]/)
+      .matches(/[0-9]/),
   ],
   handleValidation,
   async (req, res) => {
     try {
       const { oldPassword, newPassword } = req.body;
       const user = await User.findById(req.user.id);
-
-      const isMatch = await bcrypt.compare(oldPassword, user.password);
-      if (!isMatch) return res.status(400).json({ error: 'Old password incorrect' });
+      const match = await bcrypt.compare(oldPassword, user.password);
+      if (!match) return res.status(400).json({ error: 'Old password incorrect' });
 
       user.password = await bcrypt.hash(newPassword, 10);
       await user.save();
-
-      res.json({ message: 'Password updated successfully' });
+      res.json({ message: 'Password updated' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
